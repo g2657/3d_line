@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Work Projection</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #121512;
+      --paper: #f7f7f0;
+      --paper-soft: #eceee4;
+      --panel: #171b16;
+      --panel-2: #20271e;
+      --line: rgba(21, 26, 20, 0.15);
+      --soft-line: rgba(255, 255, 255, 0.14);
+      --text: #f4f7ef;
+      --muted: #a9b3a1;
+      --acid: #dfff4f;
+      --cyan: #75d4ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--panel);
+      color: var(--text);
+      font-family: "Bahnschrift", "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: grid;
+      grid-template-rows: 60px 1fr;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--soft-line);
+      background:
+        linear-gradient(90deg, rgba(223, 255, 79, 0.08), transparent 36%),
+        var(--panel);
+    }
+
+    .title {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(223, 255, 79, 0.55);
+      color: var(--acid);
+      font-weight: 800;
+      background: #111510;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    button,
+    .upload {
+      height: 38px;
+      border: 1px solid var(--soft-line);
+      background: #121711;
+      color: var(--text);
+      padding: 0 13px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+    }
+
+    button:hover,
+    .upload:hover {
+      border-color: rgba(223, 255, 79, 0.58);
+      background: var(--panel-2);
+    }
+
+    button:disabled {
+      color: #697164;
+      cursor: not-allowed;
+      border-color: rgba(255, 255, 255, 0.08);
+      background: #111510;
+    }
+
+    button.active {
+      border-color: rgba(223, 255, 79, 0.72);
+      color: var(--acid);
+      background: #20271e;
+    }
+
+    .primary {
+      color: #111510;
+      background: var(--acid);
+      border-color: var(--acid);
+      font-weight: 700;
+    }
+
+    .primary:hover {
+      color: #111510;
+      background: #e7ff78;
+    }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: var(--paper);
+    }
+
+    .pane {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(18, 21, 18, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(18, 21, 18, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+    }
+
+    .pane.model {
+      border-right: 1px solid rgba(18, 21, 18, 0.18);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .label {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      z-index: 2;
+      padding: 7px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(18, 21, 18, 0.14);
+      background: rgba(255, 255, 255, 0.68);
+      color: var(--ink);
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .label::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--acid);
+      box-shadow: 0 0 0 4px rgba(223, 255, 79, 0.22);
+    }
+
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      pointer-events: none;
+      color: #64705f;
+      padding: 24px;
+    }
+
+    .empty strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--ink);
+      font-size: 22px;
+    }
+
+    .empty span {
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      z-index: 3;
+      transform: translateX(-50%);
+      max-width: min(420px, calc(100% - 32px));
+      padding: 8px 11px;
+      border: 1px solid rgba(18, 21, 18, 0.13);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink);
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        grid-template-rows: auto 1fr;
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        flex-wrap: wrap;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .pane.model {
+        border-right: 0;
+        border-bottom: 1px solid rgba(18, 21, 18, 0.18);
+      }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/",
+        "three/examples/jsm/": "./vendor/three/examples/jsm/",
+        "three-mesh-bvh": "./vendor/three-mesh-bvh/build/index.module.js"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="title">
+      <div class="badge">W</div>
+      <div>
+        <h1>Work Projection</h1>
+        <div id="fileName" class="sub">批量上传：支持 GLB / GLTF / FBX</div>
+      </div>
+    </div>
+    <div class="actions">
+      <label class="upload" for="fileInput">上传模型</label>
+      <input id="fileInput" type="file" multiple accept=".glb,.gltf,.fbx,model/gltf-binary,model/gltf+json" />
+      <button id="rotateBtn" type="button" disabled>旋转模式</button>
+      <button id="scaleBtn" type="button" disabled>缩放模式</button>
+      <button id="pngBtn" type="button" disabled>导出 PNG</button>
+      <button id="glbBtn" class="primary" type="button" disabled>导出投影 GLB</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="pane model" id="modelPane">
+      <div class="label">模型操作</div>
+      <div class="empty" id="emptyState">
+        <div>
+          <strong>上传一个或多个模型</strong>
+          <span>左侧点击选择模型后旋转/缩放，右侧实时刷新对应投影。</span>
+        </div>
+      </div>
+    </section>
+    <section class="pane projection" id="projectionPane">
+      <div class="label">投影结果</div>
+      <div class="toast" id="toast">准备中</div>
+    </section>
+  </main>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+    import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+    import { ProjectionGenerator } from './vendor/three-edge-projection/src/ProjectionGenerator.js';
+
+    const modelPane = document.getElementById('modelPane');
+    const projectionPane = document.getElementById('projectionPane');
+    const fileInput = document.getElementById('fileInput');
+    const fileName = document.getElementById('fileName');
+    const emptyState = document.getElementById('emptyState');
+    const rotateBtn = document.getElementById('rotateBtn');
+    const scaleBtn = document.getElementById('scaleBtn');
+    const pngBtn = document.getElementById('pngBtn');
+    const glbBtn = document.getElementById('glbBtn');
+    const toast = document.getElementById('toast');
+    const TRANSFORM_GIZMO_SIZE = 0.62;
+    const MODEL_VIEW_MARGIN = 1.16;
+    const SCREENSHOT_SIZE = 1200;
+    const GRID_GAP = 1.45;
+
+    const modelScene = new THREE.Scene();
+    const projectionScene = new THREE.Scene();
+    modelScene.background = new THREE.Color(0xf7f7f0);
+    projectionScene.background = new THREE.Color(0xf7f7f0);
+
+    const modelCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 10000);
+    const projectionCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.001, 10000);
+    projectionCamera.position.set(0, 100, 0);
+    projectionCamera.up.set(0, 0, 1);
+    projectionCamera.lookAt(0, 0, 0);
+
+    const modelRenderer = new THREE.WebGLRenderer({ antialias: true });
+    const projectionRenderer = new THREE.WebGLRenderer({ antialias: true });
+    modelRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    projectionRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    modelRenderer.setClearColor(0xf7f7f0, 1);
+    projectionRenderer.setClearColor(0xf7f7f0, 1);
+    modelPane.appendChild(modelRenderer.domElement);
+    projectionPane.appendChild(projectionRenderer.domElement);
+
+    const modelControls = new OrbitControls(modelCamera, modelRenderer.domElement);
+    modelControls.enableRotate = false;
+    modelControls.enablePan = false;
+    modelControls.enableZoom = true;
+    modelControls.enableDamping = true;
+    modelControls.dampingFactor = 0.08;
+    modelControls.zoomSpeed = 0.9;
+
+    const transformControls = new TransformControls(modelCamera, modelRenderer.domElement);
+    transformControls.setMode('rotate');
+    transformControls.setSpace('local');
+    transformControls.setSize(TRANSFORM_GIZMO_SIZE);
+    transformControls.addEventListener('objectChange', () => scheduleProjection(activeItem));
+    transformControls.addEventListener('change', () => modelRenderer.render(modelScene, modelCamera));
+    transformControls.addEventListener('dragging-changed', event => {
+      modelControls.enabled = !event.value;
+    });
+    modelScene.add(transformControls.getHelper());
+
+    modelScene.add(new THREE.HemisphereLight(0xffffff, 0xc4cabd, 1.8));
+    modelScene.add(new THREE.AmbientLight(0xffffff, 0.65));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+    keyLight.position.set(5, 8, 6);
+    modelScene.add(keyLight);
+
+    const grid = new THREE.GridHelper(10, 10, 0xbfc7b8, 0xdfe3d8);
+    grid.position.y = -0.02;
+    projectionScene.add(grid);
+
+    const manager = new THREE.LoadingManager();
+    const gltfLoader = new GLTFLoader(manager);
+    const fbxLoader = new FBXLoader(manager);
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('./vendor/three/examples/jsm/libs/draco/');
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    let modelItems = [];
+    let activeItem = null;
+    let modelUrls = [];
+    let projectionMaterial = new THREE.LineBasicMaterial({ color: 0x101310 });
+    let projecting = false;
+    let queued = false;
+    let projectionTimer = 0;
+    const pendingProjectionItems = new Set();
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const projectionCenter = new THREE.Vector3();
+    const projectionRight = new THREE.Vector3();
+    const projectionUp = new THREE.Vector3();
+    const projectionTowardCamera = new THREE.Vector3();
+    const projectionBasisMatrix = new THREE.Matrix4();
+
+    fileInput.addEventListener('change', async () => {
+      const files = Array.from(fileInput.files || []);
+      fileInput.value = '';
+      if (!files.length) return;
+
+      const invalid = files.find(file => !isSupportedModelFile(file));
+      if (invalid) {
+        showToast(`不支持：${invalid.name}，只支持 GLB / GLTF / FBX`, true);
+        return;
+      }
+
+      clearModelItems();
+      showToast(`正在加载 ${files.length} 个模型`);
+
+      try {
+        const items = [];
+        for (const file of files) {
+          const url = URL.createObjectURL(file);
+          modelUrls.push(url);
+          const loaded = await loadModelFile(file, url);
+          items.push(createModelItem(loaded, file.name));
+        }
+        setModelItems(items);
+      } catch (error) {
+        console.error(error);
+        clearModelItems();
+        showToast('加载失败：建议使用单文件 GLB，FBX 外部贴图需和模型路径可访问', true);
+      }
+    });
+
+    rotateBtn.addEventListener('click', () => setTransformMode('rotate'));
+    scaleBtn.addEventListener('click', () => setTransformMode('scale'));
+
+    pngBtn.addEventListener('click', () => {
+      if (modelItems.some(item => item.projectionLines)) exportTransparentPng();
+    });
+
+    glbBtn.addEventListener('click', () => {
+      if (modelItems.some(item => item.projectionLines)) exportProjectionGlb();
+    });
+
+    modelRenderer.domElement.addEventListener('pointerdown', event => {
+      if (transformControls.dragging || !modelItems.length) return;
+
+      const rect = modelRenderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, modelCamera);
+
+      const intersections = raycaster.intersectObjects(modelItems.map(item => item.object), true);
+      if (!intersections.length) return;
+
+      const item = findModelItem(intersections[0].object);
+      if (item) selectModelItem(item);
+    });
+
+    function isSupportedModelFile(file) {
+      return ['glb', 'gltf', 'fbx'].includes(getFileExtension(file.name));
+    }
+
+    function getFileExtension(filename) {
+      return filename.split('.').pop()?.toLowerCase() || '';
+    }
+
+    async function loadModelFile(file, url) {
+      const extension = getFileExtension(file.name);
+      if (extension === 'fbx') return fbxLoader.loadAsync(url);
+      return (await gltfLoader.loadAsync(url)).scene;
+    }
+
+    function createModelItem(object, name) {
+      object.name = name.replace(/\.(glb|gltf|fbx)$/i, '');
+      prepareModel(object);
+      centerModelPivot(object);
+      return {
+        id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+        name: object.name,
+        object,
+        projectionLines: null,
+        sourceBox: new THREE.Box3(),
+      };
+    }
+
+    function setModelItems(items) {
+      modelItems = items;
+      arrangeModelItems();
+
+      for (const item of modelItems) {
+        modelScene.add(item.object);
+      }
+
+      activeItem = modelItems[0] || null;
+      if (activeItem) transformControls.attach(activeItem.object);
+
+      fileName.textContent = modelItems.length === 1
+        ? modelItems[0].name
+        : `已加载 ${modelItems.length} 个模型`;
+      emptyState.style.display = modelItems.length ? 'none' : '';
+      rotateBtn.disabled = !modelItems.length;
+      scaleBtn.disabled = !modelItems.length;
+      pngBtn.disabled = true;
+      glbBtn.disabled = true;
+
+      setTransformMode('rotate');
+      frameModels(true);
+      scheduleAllProjections();
+      showToast('点击左侧模型切换选择，拖动彩色圆环旋转，右侧批量生成投影');
+    }
+
+    function selectModelItem(item) {
+      activeItem = item;
+      transformControls.attach(item.object);
+      transformControls.setSize(TRANSFORM_GIZMO_SIZE);
+      showToast(`已选择：${item.name}`);
+    }
+
+    function findModelItem(object) {
+      return modelItems.find(item => {
+        let current = object;
+        while (current) {
+          if (current === item.object) return true;
+          current = current.parent;
+        }
+        return false;
+      });
+    }
+
+    function arrangeModelItems() {
+      if (!modelItems.length) return;
+
+      const footprints = modelItems.map(item => {
+        item.object.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(item.object);
+        const size = box.getSize(new THREE.Vector3());
+        return Math.max(size.x, size.z, size.y, 0.001);
+      });
+      const cellSize = Math.max(...footprints) * GRID_GAP;
+      const columns = Math.ceil(Math.sqrt(modelItems.length));
+      const rows = Math.ceil(modelItems.length / columns);
+
+      modelItems.forEach((item, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        const x = (col - (columns - 1) * 0.5) * cellSize;
+        const z = ((rows - 1) * 0.5 - row) * cellSize;
+        item.object.position.set(x, 0, z);
+        item.object.updateMatrixWorld(true);
+      });
+    }
+
+    function prepareModel(object) {
+      object.traverse(child => {
+        if (!child.isMesh) return;
+        child.frustumCulled = false;
+        if (Array.isArray(child.material)) {
+          child.material.forEach(material => material.side = THREE.DoubleSide);
+        } else if (child.material) {
+          child.material.side = THREE.DoubleSide;
+        }
+      });
+    }
+
+    function centerModelPivot(object) {
+      object.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(object);
+      if (box.isEmpty()) return;
+
+      const centerWorld = box.getCenter(new THREE.Vector3());
+      const centerLocal = object.worldToLocal(centerWorld.clone());
+      for (const child of object.children) {
+        child.position.sub(centerLocal);
+      }
+
+      object.position.set(0, 0, 0);
+      object.updateMatrixWorld(true);
+    }
+
+    function setTransformMode(mode) {
+      transformControls.setMode(mode);
+      transformControls.setSize(TRANSFORM_GIZMO_SIZE);
+      rotateBtn.classList.toggle('active', mode === 'rotate');
+      scaleBtn.classList.toggle('active', mode === 'scale');
+      showToast(mode === 'rotate' ? '当前：旋转模式' : '当前：缩放模式');
+    }
+
+    function frameModels(resetAzimuth = false) {
+      if (!modelItems.length) return;
+
+      const box = getModelItemsBox();
+      if (box.isEmpty()) return;
+
+      const center = box.getCenter(new THREE.Vector3());
+      const viewDir = resetAzimuth
+        ? new THREE.Vector3(0.78, 0.52, 0.72).normalize()
+        : modelCamera.position.clone().sub(center).normalize();
+      const aspect = modelPane.clientWidth / Math.max(modelPane.clientHeight, 1);
+      const halfFov = THREE.MathUtils.degToRad(modelCamera.fov * 0.5);
+      const tanHalfFov = Math.tan(halfFov);
+      const fitDistance = getCameraFitDistance(box, center, viewDir, aspect, tanHalfFov);
+
+      modelCamera.near = Math.max(fitDistance / 2000, 0.001);
+      modelCamera.far = fitDistance * 2000;
+      modelCamera.position.copy(center).addScaledVector(viewDir, fitDistance);
+      modelCamera.lookAt(center);
+      modelCamera.updateProjectionMatrix();
+      modelControls.target.copy(center);
+      modelControls.update();
+      transformControls.setSize(TRANSFORM_GIZMO_SIZE);
+    }
+
+    function getModelItemsBox() {
+      const box = new THREE.Box3();
+      for (const item of modelItems) {
+        item.object.updateMatrixWorld(true);
+        box.expandByObject(item.object);
+      }
+      return box;
+    }
+
+    function getCameraFitDistance(box, center, viewDir, aspect, tanHalfFov) {
+      const upHint = Math.abs(viewDir.dot(new THREE.Vector3(0, 1, 0))) > 0.92
+        ? new THREE.Vector3(0, 0, 1)
+        : new THREE.Vector3(0, 1, 0);
+      const right = new THREE.Vector3().crossVectors(upHint, viewDir).normalize();
+      const up = new THREE.Vector3().crossVectors(viewDir, right).normalize();
+      const corners = [
+        new THREE.Vector3(box.min.x, box.min.y, box.min.z),
+        new THREE.Vector3(box.min.x, box.min.y, box.max.z),
+        new THREE.Vector3(box.min.x, box.max.y, box.min.z),
+        new THREE.Vector3(box.min.x, box.max.y, box.max.z),
+        new THREE.Vector3(box.max.x, box.min.y, box.min.z),
+        new THREE.Vector3(box.max.x, box.min.y, box.max.z),
+        new THREE.Vector3(box.max.x, box.max.y, box.min.z),
+        new THREE.Vector3(box.max.x, box.max.y, box.max.z),
+      ];
+
+      let xExtent = 0;
+      let yExtent = 0;
+      let depthExtent = 0;
+      for (const corner of corners) {
+        const offset = corner.sub(center);
+        xExtent = Math.max(xExtent, Math.abs(offset.dot(right)));
+        yExtent = Math.max(yExtent, Math.abs(offset.dot(up)));
+        depthExtent = Math.max(depthExtent, Math.abs(offset.dot(viewDir)));
+      }
+
+      const projectedFitDistance = Math.max(
+        yExtent / tanHalfFov,
+        xExtent / (tanHalfFov * Math.max(aspect, 0.001))
+      ) * MODEL_VIEW_MARGIN;
+      const minimumDistance = depthExtent * 1.05 + 0.001;
+
+      return Math.max(projectedFitDistance, minimumDistance, 0.1);
+    }
+
+    function scheduleProjection(item = activeItem) {
+      if (!item) return;
+      pendingProjectionItems.add(item);
+      window.clearTimeout(projectionTimer);
+      projectionTimer = window.setTimeout(updateProjection, 130);
+    }
+
+    function scheduleAllProjections() {
+      pendingProjectionItems.clear();
+      for (const item of modelItems) {
+        pendingProjectionItems.add(item);
+      }
+      window.clearTimeout(projectionTimer);
+      projectionTimer = window.setTimeout(updateProjection, 60);
+    }
+
+    async function updateProjection() {
+      if (!pendingProjectionItems.size) return;
+      if (projecting) {
+        queued = true;
+        return;
+      }
+
+      projecting = true;
+      queued = false;
+
+      try {
+        do {
+          queued = false;
+          const queue = Array.from(pendingProjectionItems);
+          pendingProjectionItems.clear();
+          for (let index = 0; index < queue.length; index++) {
+            showToast(`正在生成投影 ${index + 1}/${queue.length}`);
+            await updateProjectionItem(queue[index]);
+          }
+        } while (pendingProjectionItems.size || queued);
+
+        frameProjectionScene(projectionPane.clientWidth / Math.max(projectionPane.clientHeight, 1), 1.16);
+        pngBtn.disabled = false;
+        glbBtn.disabled = false;
+        showToast(`投影已更新：${modelItems.length} 个模型`);
+      } catch (error) {
+        console.error(error);
+        showToast('投影生成失败', true);
+      } finally {
+        projecting = false;
+      }
+    }
+
+    async function updateProjectionItem(item) {
+      if (!modelItems.includes(item)) return;
+
+      const mergedGeometry = createMergedGeometry(item);
+      if (!mergedGeometry) return;
+
+      const projectionGeometry = await new ProjectionGenerator().generateAsync(mergedGeometry);
+      mergedGeometry.dispose();
+      clearProjection(item);
+
+      item.projectionLines = new THREE.LineSegments(projectionGeometry, projectionMaterial);
+      item.projectionLines.position.set(item.object.position.x, 0.02, item.object.position.z);
+      projectionScene.add(item.projectionLines);
+    }
+
+    function createMergedGeometry(item) {
+      const geometries = [];
+      item.object.updateMatrixWorld(true);
+      updateProjectionBasis(item);
+
+      item.object.traverse(child => {
+        if (!child.isMesh || !child.geometry?.attributes?.position) return;
+
+        const geometry = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry.clone();
+        geometry.applyMatrix4(child.matrixWorld);
+        geometry.applyMatrix4(projectionBasisMatrix);
+
+        const mergedPart = new THREE.BufferGeometry();
+        mergedPart.setAttribute('position', geometry.getAttribute('position').clone());
+        geometries.push(mergedPart);
+        geometry.dispose();
+      });
+
+      if (!geometries.length) return null;
+      const mergedGeometry = mergeGeometries(geometries);
+      geometries.forEach(geometry => geometry.dispose());
+      return mergedGeometry;
+    }
+
+    function updateProjectionBasis(item) {
+      item.object.updateMatrixWorld(true);
+      modelCamera.updateMatrixWorld(true);
+
+      item.sourceBox = new THREE.Box3().setFromObject(item.object);
+      item.sourceBox.getCenter(projectionCenter);
+      projectionRight.setFromMatrixColumn(modelCamera.matrixWorld, 0).normalize().negate();
+      projectionUp.setFromMatrixColumn(modelCamera.matrixWorld, 1).normalize();
+      modelCamera.getWorldDirection(projectionTowardCamera).negate().normalize();
+
+      projectionBasisMatrix.set(
+        projectionRight.x, projectionRight.y, projectionRight.z, -projectionRight.dot(projectionCenter),
+        projectionTowardCamera.x, projectionTowardCamera.y, projectionTowardCamera.z, -projectionTowardCamera.dot(projectionCenter),
+        projectionUp.x, projectionUp.y, projectionUp.z, -projectionUp.dot(projectionCenter),
+        0, 0, 0, 1
+      );
+    }
+
+    function frameProjection(geometry, aspect, margin = 1.1, camera = projectionCamera, sourceBox = null, updateGrid = true) {
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const width = Math.max(size.x, 0.001);
+      const depth = Math.max(size.z, 0.001);
+      let viewWidth = width * margin;
+      let viewHeight = depth * margin;
+
+      if (viewWidth / viewHeight > aspect) {
+        viewHeight = viewWidth / aspect;
+      } else {
+        viewWidth = viewHeight * aspect;
+      }
+
+      camera.left = -viewWidth * 0.5;
+      camera.right = viewWidth * 0.5;
+      camera.top = viewHeight * 0.5;
+      camera.bottom = -viewHeight * 0.5;
+      camera.near = 0.001;
+      camera.far = Math.max((sourceBox?.getSize(new THREE.Vector3()).y || size.y) + 100, 200);
+      camera.position.set(center.x, camera.far * 0.45, center.z);
+      camera.up.set(0, 0, 1);
+      camera.lookAt(center.x, 0, center.z);
+      camera.updateProjectionMatrix();
+
+      if (updateGrid) {
+        grid.scale.setScalar(Math.max(width, depth, 1) / 10);
+        grid.position.set(center.x, -0.02, center.z);
+      }
+    }
+
+    function frameProjectionScene(aspect, margin = 1.1, camera = projectionCamera) {
+      const box = new THREE.Box3();
+      const availableItems = modelItems.filter(item => item.projectionLines);
+      for (const item of availableItems) {
+        item.projectionLines.updateMatrixWorld(true);
+        box.expandByObject(item.projectionLines);
+      }
+      if (box.isEmpty()) return;
+
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const width = Math.max(size.x, 0.001);
+      const depth = Math.max(size.z, 0.001);
+      let viewWidth = width * margin;
+      let viewHeight = depth * margin;
+
+      if (viewWidth / viewHeight > aspect) {
+        viewHeight = viewWidth / aspect;
+      } else {
+        viewWidth = viewHeight * aspect;
+      }
+
+      camera.left = -viewWidth * 0.5;
+      camera.right = viewWidth * 0.5;
+      camera.top = viewHeight * 0.5;
+      camera.bottom = -viewHeight * 0.5;
+      camera.near = 0.001;
+      camera.far = Math.max(size.y + 100, 200);
+      camera.position.set(center.x, camera.far * 0.45, center.z);
+      camera.up.set(0, 0, 1);
+      camera.lookAt(center.x, 0, center.z);
+      camera.updateProjectionMatrix();
+
+      grid.scale.setScalar(Math.max(width, depth, 1) / 10);
+      grid.position.set(center.x, -0.02, center.z);
+    }
+
+    function exportTransparentPng() {
+      const availableItems = modelItems.filter(item => item.projectionLines);
+      for (const item of availableItems) {
+        exportTransparentPngItem(item);
+      }
+      showToast(`已导出 ${availableItems.length} 张透明 PNG`);
+    }
+
+    function exportTransparentPngItem(item) {
+      const geometry = item.projectionLines.geometry;
+      geometry.computeBoundingBox();
+      const outSize = SCREENSHOT_SIZE;
+
+      const scene = new THREE.Scene();
+      const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+      const lines = new THREE.LineSegments(geometry.clone(), material);
+      scene.add(lines);
+
+      const camera = projectionCamera.clone();
+      frameProjection(lines.geometry, 1, 1.035, camera, item.sourceBox, false);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.setPixelRatio(1);
+      renderer.setSize(outSize, outSize, false);
+      renderer.setClearColor(0x000000, 0);
+      renderer.render(scene, camera);
+
+      downloadDataUrl(renderer.domElement.toDataURL('image/png'), `${item.name || 'projection'}-transparent.png`);
+      renderer.dispose();
+      lines.geometry.dispose();
+      material.dispose();
+    }
+
+    function exportProjectionGlb() {
+      const scene = new THREE.Scene();
+      for (const item of modelItems) {
+        if (!item.projectionLines) continue;
+        const clone = item.projectionLines.clone(true);
+        scene.add(clone);
+      }
+
+      new GLTFExporter().parse(
+        scene,
+        result => {
+          const blob = new Blob([result], { type: 'model/gltf-binary' });
+          downloadBlob(blob, `batch-projection-${modelItems.length}.glb`);
+        },
+        error => {
+          console.error(error);
+          showToast('导出失败', true);
+        },
+        { binary: true }
+      );
+    }
+
+    function resizeRenderer(renderer, pane, camera) {
+      const width = Math.max(pane.clientWidth, 1);
+      const height = Math.max(pane.clientHeight, 1);
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+      renderer.setPixelRatio(pixelRatio);
+      renderer.setSize(width, height, false);
+
+      if (camera.isPerspectiveCamera) {
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      } else if (modelItems.some(item => item.projectionLines)) {
+        frameProjectionScene(width / height, 1.16, camera);
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      resizeRenderer(modelRenderer, modelPane, modelCamera);
+      resizeRenderer(projectionRenderer, projectionPane, projectionCamera);
+      modelControls.update();
+      modelRenderer.render(modelScene, modelCamera);
+      projectionRenderer.render(projectionScene, projectionCamera);
+    }
+
+    function clearProjection(item) {
+      if (!item) {
+        for (const modelItem of modelItems) {
+          clearProjection(modelItem);
+        }
+        pngBtn.disabled = true;
+        glbBtn.disabled = true;
+        return;
+      }
+      if (!item.projectionLines) return;
+      projectionScene.remove(item.projectionLines);
+      item.projectionLines.geometry.dispose();
+      item.projectionLines = null;
+    }
+
+    function showToast(text, sticky = false) {
+      toast.textContent = text;
+      toast.classList.add('show');
+      window.clearTimeout(showToast.timer);
+      if (!sticky) {
+        showStatusTimer(() => toast.classList.remove('show'), 1200);
+      }
+    }
+
+    function showStatusTimer(fn, delay) {
+      showToast.timer = window.setTimeout(fn, delay);
+    }
+
+    function downloadDataUrl(dataUrl, filename) {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      link.click();
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function clearModelItems() {
+      pendingProjectionItems.clear();
+      window.clearTimeout(projectionTimer);
+      clearProjection();
+
+      if (activeItem) {
+        transformControls.detach();
+        activeItem = null;
+      }
+
+      for (const item of modelItems) {
+        disposeObject(item.object);
+      }
+      modelItems = [];
+      revokeModelUrls();
+
+      fileName.textContent = '批量上传：支持 GLB / GLTF / FBX';
+      emptyState.style.display = '';
+      rotateBtn.disabled = true;
+      scaleBtn.disabled = true;
+      pngBtn.disabled = true;
+      glbBtn.disabled = true;
+    }
+
+    function disposeObject(object) {
+      if (!object) return;
+      object.parent?.remove(object);
+      if (transformControls.object === object) transformControls.detach();
+      object.traverse(child => {
+        child.geometry?.dispose?.();
+        if (Array.isArray(child.material)) {
+          child.material.forEach(disposeMaterial);
+        } else {
+          disposeMaterial(child.material);
+        }
+      });
+    }
+
+    function disposeMaterial(material) {
+      if (!material) return;
+      Object.values(material).forEach(value => {
+        if (value?.isTexture) value.dispose();
+      });
+      material.dispose?.();
+    }
+
+    function revokeModelUrls() {
+      for (const url of modelUrls) {
+        URL.revokeObjectURL(url);
+      }
+      modelUrls = [];
+    }
+
+    window.addEventListener('beforeunload', revokeModelUrls);
+    animate();
+  </script>
+</body>
+
+</html>
